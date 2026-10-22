@@ -1,3 +1,5 @@
+(function() {
+
 console.log("Wikiprojects.js run started at " + new Date());
 
 //Set up parameters
@@ -27,10 +29,12 @@ var api = new mw.Api({ ajax: { url: apiUrl} });
 api.login( credentials.username, credentials.password )
 	.done (function (data) {
 		console.log("Logged in as "+data.login.lgusername);
-		configObject = fetchJSONList(configFile);
-		wikiProjectCategories = [configObject["WikiProject main category"]]
-			.concat(configObject["Other WikiProject template categories not included in 'WikiProject main category'"]);
-		getTemplateCategories();
+		fetchJSONList(configFile).done(function(parsedConfig) {
+			configObject = parsedConfig;
+			wikiProjectCategories = [configObject["WikiProject main category"]]
+				.concat(configObject["Other WikiProject template categories not included in 'WikiProject main category'"]);
+			getTemplateCategories();
+		});
 	} ).fail (function(error) {
 		console.error("Error logging in:");
 		console.error(error);
@@ -38,28 +42,29 @@ api.login( credentials.username, credentials.password )
 	} );
 
 function fetchJSONList(listName) {
-	var parsedList = {};
 	//console.log("Attempting to fetch " + listName + "...");
-	var listData = JSON.parse($.ajax({
-		url: apiUrl, async:false,
+	return $.ajax({
+		url: apiUrl,
 		error: function (jsondata) {
 			console.warn("Unable to fetch contents of " + listName + ":");
 			console.log(jsondata);
 			return {};				
 		}, data: {action:'parse', format:'json', prop:'wikitext', page: listName, formatversion: '2', origin: '*' }
-	}).responseText).parse;
-	//console.log("Attempting to parse " + listName + "...");
-	if (listData && listData.wikitext) {
-		try {
-			parsedList = JSON.parse(listData.wikitext);
-			console.log("Successfully parsed " + listName);
-		} catch (jsonerror) {
-			console.warn("Error parsing JSON list " + listName + ":");
-			console.log(jsonerror);
+	}).then(function(response) {
+		var parsedList = {};
+		var listData = response.parse;
+		//console.log("Attempting to parse " + listName + "...");
+		if (listData && listData.wikitext) {
+			try {
+				parsedList = JSON.parse(listData.wikitext);
+				console.log("Successfully parsed " + listName);
+			} catch (jsonerror) {
+				console.warn("Error parsing JSON list " + listName + ":");
+				console.log(jsonerror);
+			}
 		}
-	}
-
-	return parsedList;
+		return parsedList;
+	});
 }
 
 function getTemplateCategories(cont) { // Recursively call API
@@ -175,3 +180,5 @@ function writeList() {
 		console.log(reslt);
 	} );
 }
+
+})();
